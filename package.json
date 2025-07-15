@@ -1,0 +1,31 @@
+{
+  "name": "preciously.ai",
+  "version": "1.0.0",
+  "description": "AI-powered visual novel platform",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "start": "cd backend && npm start",
+    "setup": "npm run setup:db",
+    "setup:db": "cd backend && npx prisma generate && npx prisma migrate dev --name init",
+    "stop": "cd backend && npm run stop",
+    "postinstall": "npm run install:backend && npm run install:frontend && npm run install:packages",
+    "install:backend": "cd backend && npm install",
+    "install:frontend": "cd frontend && npm install", 
+    "install:packages": "cd packages/novel-engine && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "@radix-ui/react-avatar": "^1.1.10",
+    "@radix-ui/react-scroll-area": "^1.2.9",
+    "@radix-ui/react-tabs": "^1.1.12",
+    "framer-motion": "^12.23.5"
+  }
+}

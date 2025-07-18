@@ -1,0 +1,9 @@
+{
+  "devCommand": "cd frontend && npm run dev",
+  "functions": {
+    "api/**/*.ts": {
+      "maxDuration": 10,
+      "runtime": "nodejs18.x"
+    }
+  }
+}

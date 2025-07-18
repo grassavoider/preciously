@@ -1,0 +1,27 @@
+# Backend source files (only need compiled API functions)
+backend/src
+backend/prisma
+backend/node_modules
+backend/dist
+backend/.env
+backend/dev.db
+backend/uploads
+
+# Package source
+packages/
+
+# Development files
+*.md
+.git
+.gitignore
+.env
+.env.local
+
+# RISUAI and MIKU folders
+RISUAI/
+MIKU/
+
+# Logs and temp files
+*.log
+npm-debug.log*
+.DS_Store

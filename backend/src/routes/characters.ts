@@ -3,17 +3,10 @@ import { PrismaClient } from '@prisma/client';
 import multer from 'multer';
 import path from 'path';
 import { CharacterCardService } from '../services/characterCard';
+import { requireAuth } from '../middleware/auth';
 
 const router = Router();
 const prisma = new PrismaClient();
-
-// Middleware
-const requireAuth = (req: any, res: any, next: any) => {
-  if (!req.session.userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  next();
-};
 
 // Configure multer
 const storage = multer.diskStorage({

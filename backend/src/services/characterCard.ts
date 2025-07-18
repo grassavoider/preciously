@@ -26,9 +26,9 @@ interface CharacterCardV2 {
 }
 
 export class CharacterCardService {
-  static async extractFromPNG(filePath: string): Promise<CharacterCard | null> {
+  static async extractFromPNGBuffer(buffer: Buffer): Promise<CharacterCard | null> {
     try {
-      const data = readFileSync(filePath);
+      const data = buffer;
       
       // PNG magic number
       const pngSignature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
@@ -57,22 +57,13 @@ export class CharacterCardService {
         // Skip CRC (4 bytes)
         pos += 4;
 
-        // Check if it's a tEXt chunk
         if (type === 'tEXt') {
-          // Find null separator between keyword and text
-          let nullIndex = -1;
-          for (let i = 0; i < chunkData.length; i++) {
-            if (chunkData[i] === 0) {
-              nullIndex = i;
-              break;
-            }
-          }
-
+          // Find null separator
+          const nullIndex = chunkData.indexOf(0);
           if (nullIndex !== -1) {
-            const keyword = chunkData.subarray(0, nullIndex).toString('ascii');
-            const textData = chunkData.subarray(nullIndex + 1).toString('latin1');
-
-            // Check for character data chunks
+            const keyword = chunkData.subarray(0, nullIndex).toString('utf-8');
+            const textData = chunkData.subarray(nullIndex + 1).toString('utf-8');
+            
             if (keyword === 'chara' || keyword === 'ccv3') {
               characterData = textData;
               break;
@@ -81,28 +72,66 @@ export class CharacterCardService {
         }
 
         // Stop at IEND chunk
-        if (type === 'IEND') {
-          break;
-        }
+        if (type === 'IEND') break;
       }
 
       if (!characterData) {
+        console.error('No character data found in PNG');
         return null;
       }
 
-      // Decode base64 and parse JSON
-      const decodedData = Buffer.from(characterData, 'base64').toString('utf8');
-      const parsed = JSON.parse(decodedData);
-
-      // Handle different formats
-      if (parsed.spec === 'chara_card_v2' && parsed.spec_version === '2.0') {
-        return parsed.data;
-      } else if (parsed.spec === 'chara_card_v3') {
-        return parsed.data;
-      } else {
-        // Handle old format (direct character data)
+      try {
+        // Try to decode as base64 first
+        const decodedData = Buffer.from(characterData, 'base64').toString('utf-8');
+        const parsed = JSON.parse(decodedData);
+        
+        // Handle V2/V3 format
+        if (parsed.spec === 'chara_card_v2' && parsed.data) {
+          return parsed.data;
+        }
+        
         return parsed;
+      } catch (e) {
+        // If base64 decode fails, try parsing directly
+        try {
+          const parsed = JSON.parse(characterData);
+          if (parsed.spec === 'chara_card_v2' && parsed.data) {
+            return parsed.data;
+          }
+          return parsed;
+        } catch (e2) {
+          console.error('Failed to parse character data:', e2);
+          return null;
+        }
       }
+    } catch (error) {
+      console.error('PNG extraction error:', error);
+      return null;
+    }
+  }
+
+  static async parseCharXBuffer(buffer: Buffer): Promise<CharacterCard | null> {
+    try {
+      // Try parsing as JSON first
+      const text = buffer.toString('utf-8');
+      const data = JSON.parse(text);
+      
+      // Handle V2/V3 format
+      if (data.spec === 'chara_card_v2' && data.data) {
+        return data.data;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('CharX parsing error:', error);
+      return null;
+    }
+  }
+
+  static async extractFromPNG(filePath: string): Promise<CharacterCard | null> {
+    try {
+      const data = readFileSync(filePath);
+      return this.extractFromPNGBuffer(data);
     } catch (error) {
       console.error('Error extracting character from PNG:', error);
       return null;
@@ -112,60 +141,14 @@ export class CharacterCardService {
   static async parseCharX(filePath: string): Promise<CharacterCard | null> {
     try {
       const data = readFileSync(filePath);
-      
-      // CharX files are typically JSON or compressed JSON
-      let jsonData: string;
-      
-      try {
-        // Try to parse as plain JSON first
-        jsonData = data.toString('utf8');
-        return JSON.parse(jsonData);
-      } catch {
-        // If that fails, try to decompress
-        try {
-          const decompressed = inflateSync(data);
-          jsonData = decompressed.toString('utf8');
-          return JSON.parse(jsonData);
-        } catch (error) {
-          console.error('Failed to parse CharX file:', error);
-          return null;
-        }
-      }
+      return this.parseCharXBuffer(data);
     } catch (error) {
-      console.error('Error reading CharX file:', error);
+      console.error('Error parsing CharX file:', error);
       return null;
     }
   }
 
-  static validateCharacterCard(card: any): card is CharacterCard {
-    return (
-      typeof card === 'object' &&
-      typeof card.name === 'string' &&
-      typeof card.description === 'string'
-    );
-  }
-
-  static async embedInPNG(characterData: CharacterCard, imagePath: string, outputPath: string): Promise<void> {
-    const imageData = readFileSync(imagePath);
-    const png = PNG.sync.read(imageData);
-    
-    // Create tEXt chunk with character data
-    const characterJson = JSON.stringify(characterData);
-    const characterBase64 = Buffer.from(characterJson).toString('base64');
-    const textChunk = Buffer.concat([
-      Buffer.from('chara\0'),
-      Buffer.from(characterBase64)
-    ]);
-    
-    // Add the chunk to the PNG
-    (png as any).chunks = (png as any).chunks || [];
-    (png as any).chunks.push({
-      type: 'tEXt',
-      data: textChunk
-    });
-    
-    // Write the modified PNG
-    const outputBuffer = PNG.sync.write(png);
-    require('fs').writeFileSync(outputPath, outputBuffer);
+  static validateCharacterCard(card: any): boolean {
+    return !!(card && card.name && card.description);
   }
 }

@@ -7,6 +7,7 @@ import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import path from 'path';
 import { mkdirSync } from 'fs';
+import jwt from 'jsonwebtoken';
 
 // Load environment variables
 dotenv.config();
@@ -14,10 +15,15 @@ dotenv.config();
 // Import services
 import { OpenRouterService } from './services/openrouter';
 import { CharacterCardService } from './services/characterCard';
+import { getAvailableModels, isModelAllowed } from './config/models';
+
+// Import middleware
+import { requireAuth, requireAdmin } from './middleware/auth';
 
 // Import routes
 import characterRoutes from './routes/characters';
 import novelRoutes from './routes/novels';
+import voiceRoutes from './routes/voice';
 
 // Initialize Prisma
 const prisma = new PrismaClient();
@@ -123,29 +129,6 @@ async function initializeAdmin() {
   }
 }
 
-// Authentication middleware
-const requireAuth = (req: any, res: any, next: any) => {
-  if (!req.session.userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  next();
-};
-
-const requireAdmin = async (req: any, res: any, next: any) => {
-  if (!req.session.userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  
-  const user = await prisma.user.findUnique({
-    where: { id: req.session.userId }
-  });
-  
-  if (user?.role !== 'ADMIN') {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-  
-  next();
-};
 
 // Routes
 
@@ -191,11 +174,28 @@ app.post('/api/auth/signup', async (req, res) => {
     // Set session
     req.session.userId = user.id;
     
+    // Generate JWT token
+    const jwtSecret = process.env.JWT_SECRET || process.env.SESSION_SECRET || 'your-secret-key';
+    const token = jwt.sign(
+      { 
+        id: user.id,
+        userId: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        tier: user.tier
+      },
+      jwtSecret,
+      { expiresIn: '30d' }
+    );
+    
     res.json({
+      token,
       id: user.id,
       username: user.username,
       email: user.email,
-      role: user.role
+      role: user.role,
+      tier: user.tier
     });
   } catch (error) {
     console.error('Signup error:', error);
@@ -230,11 +230,28 @@ app.post('/api/auth/signin', async (req, res) => {
     // Set session
     req.session.userId = user.id;
     
+    // Generate JWT token
+    const jwtSecret = process.env.JWT_SECRET || process.env.SESSION_SECRET || 'your-secret-key';
+    const token = jwt.sign(
+      { 
+        id: user.id,
+        userId: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        tier: user.tier
+      },
+      jwtSecret,
+      { expiresIn: '30d' }
+    );
+    
     res.json({
+      token,
       id: user.id,
       username: user.username,
       email: user.email,
-      role: user.role
+      role: user.role,
+      tier: user.tier
     });
   } catch (error) {
     console.error('Signin error:', error);
@@ -265,7 +282,8 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
       id: user.id,
       username: user.username,
       email: user.email,
-      role: user.role
+      role: user.role,
+      tier: user.tier
     });
   } catch (error) {
     console.error('Get user error:', error);
@@ -276,6 +294,23 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
 // OpenRouter proxy routes
 app.post('/api/generate/text', requireAuth, async (req, res) => {
   try {
+    // Get user to check tier
+    const user = await prisma.user.findUnique({
+      where: { id: req.session.userId }
+    });
+    
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+    
+    // Check if model is allowed for user's tier
+    if (req.body.model && !isModelAllowed(req.body.model, user.tier as 'FREE' | 'PAID')) {
+      return res.status(403).json({ 
+        error: 'This model requires a paid subscription',
+        requiredTier: 'PAID'
+      });
+    }
+    
     const result = await openRouterService.generateText(req.body);
     res.json(result);
   } catch (error: any) {
@@ -296,8 +331,22 @@ app.post('/api/generate/image', requireAuth, async (req, res) => {
 
 app.get('/api/models', requireAuth, async (req, res) => {
   try {
-    const models = await openRouterService.listModels();
-    res.json(models);
+    // Get user to check tier
+    const user = await prisma.user.findUnique({
+      where: { id: req.session.userId }
+    });
+    
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+    
+    // Get available models based on user tier
+    const availableModels = getAvailableModels(user.tier as 'FREE' | 'PAID');
+    
+    res.json({
+      models: availableModels,
+      userTier: user.tier
+    });
   } catch (error: any) {
     console.error('List models error:', error);
     res.status(500).json({ error: error.message });
@@ -440,6 +489,7 @@ app.get('/api/characters', async (req, res) => {
 // Use route modules
 app.use('/api/characters', characterRoutes);
 app.use('/api/novels', novelRoutes);
+app.use('/api/voice', voiceRoutes);
 
 // Start server
 const server = app.listen(PORT, async () => {

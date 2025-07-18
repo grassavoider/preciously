@@ -6,9 +6,11 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { Star, MessageSquare, Download, BookOpen, User } from 'lucide-react'
+import { Star, MessageSquare, Download, BookOpen, User, Volume2 } from 'lucide-react'
 import { useAuthStore } from '@/hooks/useAuthStore'
 import { useToast } from '@/components/ui/use-toast'
+import { useVoice } from '@/hooks/useVoice'
+import { VoicePlayer } from '@/components/VoicePlayer'
 
 interface Character {
   id: string
@@ -43,6 +45,8 @@ export default function CharacterDetailPage() {
   const [loading, setLoading] = useState(true)
   const { user } = useAuthStore()
   const { toast } = useToast()
+  const { generateCharacterVoice, isGenerating } = useVoice()
+  const [voiceUrl, setVoiceUrl] = useState<string | null>(null)
 
   useEffect(() => {
     fetchCharacter()
@@ -215,6 +219,25 @@ export default function CharacterDetailPage() {
                   <h3 className="font-semibold mb-2">First Message</h3>
                   <Card className="p-4 bg-muted/50">
                     <p className="whitespace-pre-wrap">{character.firstMessage}</p>
+                    <div className="mt-4 flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={async () => {
+                          const url = await generateCharacterVoice({
+                            characterName: character.name,
+                            text: character.firstMessage,
+                            personality: character.personality
+                          })
+                          setVoiceUrl(url)
+                        }}
+                        disabled={isGenerating}
+                      >
+                        <Volume2 className="h-4 w-4 mr-2" />
+                        {isGenerating ? 'Generating...' : 'Play Voice'}
+                      </Button>
+                      {voiceUrl && <VoicePlayer src={voiceUrl} minimal />}
+                    </div>
                   </Card>
                 </div>
               </div>

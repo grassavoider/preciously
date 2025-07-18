@@ -10,6 +10,9 @@ import { useToast } from '@/components/ui/use-toast'
 import { useAuthStore } from '@/hooks/useAuthStore'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useVoice } from '@/hooks/useVoice'
+import { VoicePlayer } from '@/components/VoicePlayer'
+import { ModelSelector } from '@/components/ModelSelector'
 
 interface Scene {
   id: string
@@ -72,6 +75,8 @@ export default function NovelPlayerEnhanced() {
   const { user } = useAuthStore()
   const { toast } = useToast()
   const textRef = useRef<HTMLDivElement>(null)
+  const { generateCharacterVoice, isGenerating: isGeneratingVoice } = useVoice()
+  const [currentVoiceUrl, setCurrentVoiceUrl] = useState<string | null>(null)
   
   // Novel state
   const [novel, setNovel] = useState<Novel | null>(null)
@@ -95,6 +100,7 @@ export default function NovelPlayerEnhanced() {
   const [input, setInput] = useState('')
   const [generating, setGenerating] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [selectedModel, setSelectedModel] = useState<string>('')
 
   useEffect(() => {
     if (id) {
@@ -208,12 +214,14 @@ export default function NovelPlayerEnhanced() {
         setCurrentScene(nextScene)
         startTextAnimation(nextScene)
         saveProgress(nextScene.id)
+        setCurrentVoiceUrl(null) // Clear voice when changing scenes
       }
     }
   }
 
   const handleChoice = (nextSceneId: string) => {
     if (!novel) return
+    setCurrentVoiceUrl(null) // Clear voice when making choices
     
     const nextScene = novel.scenes.find(s => s.id === nextSceneId)
     if (nextScene) {
@@ -247,7 +255,7 @@ ${currentScene?.dialogue?.text ? `Current scene: ${currentScene.dialogue.text}` 
 Respond in character. Keep responses concise and fitting for a visual novel.`
 
       const response = await axios.post('/api/generate/text', {
-        model: 'anthropic/claude-3-opus-20240229',
+        model: selectedModel || 'qwen/qwen-2.5-72b-instruct',
         messages: [
           { role: 'system', content: systemPrompt },
           ...messages.slice(-10).map(m => ({
@@ -424,10 +432,31 @@ Respond in character. Keep responses concise and fitting for a visual novel.`
           <div className="max-w-4xl mx-auto">
             {/* Speaker Name */}
             {currentScene?.dialogue?.speaker && (
-              <div className="mb-2">
+              <div className="mb-2 flex items-center gap-2">
                 <span className="px-4 py-1 bg-black/50 rounded-full text-white font-semibold">
                   {currentScene.dialogue.speaker}
                 </span>
+                {displayMode.soundEnabled && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 px-2 text-white/70 hover:text-white"
+                    onClick={async () => {
+                      if (currentScene?.dialogue?.text && currentScene?.dialogue?.speaker) {
+                        const character = novel?.characters?.find(c => c.name === currentScene.dialogue.speaker);
+                        const url = await generateCharacterVoice({
+                          characterName: currentScene.dialogue.speaker,
+                          text: currentScene.dialogue.text,
+                          personality: character?.personality
+                        });
+                        setCurrentVoiceUrl(url);
+                      }
+                    }}
+                    disabled={isGeneratingVoice}
+                  >
+                    <Volume2 className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             )}
             
@@ -439,6 +468,22 @@ Respond in character. Keep responses concise and fitting for a visual novel.`
             >
               {displayMode.mode === 'vn' ? displayedText : (currentScene?.dialogue?.text || currentScene?.narration || '')}
             </div>
+            
+            {/* Voice Player */}
+            {currentVoiceUrl && displayMode.soundEnabled && (
+              <div className="mt-2">
+                <VoicePlayer 
+                  src={currentVoiceUrl} 
+                  autoPlay 
+                  onEnded={() => {
+                    if (displayMode.autoAdvance && currentScene?.nextSceneId) {
+                      handleNextScene();
+                    }
+                  }}
+                  minimal 
+                />
+              </div>
+            )}
 
             {/* Choices or Continue */}
             <div className="mt-6">
@@ -521,7 +566,27 @@ Respond in character. Keep responses concise and fitting for a visual novel.`
                   )}>
                     <div className="p-3">
                       {message.character && message.role !== 'user' && (
-                        <p className="text-xs font-medium mb-1">{message.character}</p>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-xs font-medium">{message.character}</p>
+                          {displayMode.soundEnabled && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 p-0"
+                              onClick={async () => {
+                                const url = await generateCharacterVoice({
+                                  characterName: message.character || novel?.character?.name || 'Assistant',
+                                  text: message.content,
+                                  personality: novel?.character?.personality
+                                });
+                                setCurrentVoiceUrl(url);
+                              }}
+                              disabled={isGeneratingVoice}
+                            >
+                              <Volume2 className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
                       )}
                       <p className="whitespace-pre-wrap">{message.content}</p>
                     </div>
@@ -539,6 +604,13 @@ Respond in character. Keep responses concise and fitting for a visual novel.`
                 <div className="flex items-center gap-2 text-white/70">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span className="text-sm">Generating response...</span>
+                </div>
+              )}
+              
+              {/* Voice Player for Chat Mode */}
+              {currentVoiceUrl && displayMode.soundEnabled && (
+                <div className="mt-4">
+                  <VoicePlayer src={currentVoiceUrl} autoPlay />
                 </div>
               )}
             </div>
@@ -568,9 +640,19 @@ Respond in character. Keep responses concise and fitting for a visual novel.`
 
       {/* Settings Panel */}
       {showSettings && (
-        <div className="absolute top-16 right-4 w-64 bg-black/90 border border-white/20 rounded-lg p-4 z-30">
+        <div className="absolute top-16 right-4 w-80 bg-black/90 border border-white/20 rounded-lg p-4 z-30">
           <h3 className="font-semibold text-white mb-4">Settings</h3>
           <div className="space-y-4">
+            <div className="space-y-2">
+              <span className="text-sm text-white/80">AI Model</span>
+              <ModelSelector
+                value={selectedModel}
+                onChange={setSelectedModel}
+                type="text"
+                className="w-full"
+              />
+            </div>
+            
             <div className="flex items-center justify-between">
               <span className="text-sm text-white/80">Auto-advance</span>
               <Button

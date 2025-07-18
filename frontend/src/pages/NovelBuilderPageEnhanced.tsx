@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { useAuthStore } from '@/hooks/useAuthStore'
 import axios from '@/lib/axios'
 import { Sparkles, Upload, Loader2, Plus, X, Image as ImageIcon, User as UserIcon } from 'lucide-react'
+import { ModelSelector } from '@/components/ModelSelector'
 
 interface Character {
   id?: string
@@ -67,6 +68,7 @@ export default function NovelBuilderPageEnhanced() {
   const [generatingNovel, setGeneratingNovel] = useState(false)
   const [generatingCharacter, setGeneratingCharacter] = useState(false)
   const [generatingBackground, setGeneratingBackground] = useState(false)
+  const [selectedModel, setSelectedModel] = useState<string>('')
   
   // File uploads
   const [characterImageFile, setCharacterImageFile] = useState<File | null>(null)
@@ -117,7 +119,7 @@ Generate a JSON object with these fields:
 Make the character interesting and fitting for a visual novel. The image prompt should be detailed enough for AI image generation.`
 
       const response = await axios.post('/api/generate/text', {
-        model: 'anthropic/claude-3-opus-20240229',
+        model: selectedModel || 'qwen/qwen-2.5-72b-instruct',
         messages: [
           { role: 'system', content: 'You are a creative character designer for visual novels. Generate compelling characters with rich personalities.' },
           { role: 'user', content: characterPrompt }
@@ -339,7 +341,7 @@ Each scene must follow this exact structure:
 Create 5-7 scenes. Include at least one branching choice. Make the dialogue natural and engaging.`
 
       const response = await axios.post('/api/generate/text', {
-        model: 'anthropic/claude-3-opus-20240229',
+        model: selectedModel || 'qwen/qwen-2.5-72b-instruct',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: fullPrompt }
@@ -795,6 +797,14 @@ Create 5-7 scenes. Include at least one branching choice. Make the dialogue natu
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>AI Model</Label>
+                <ModelSelector
+                  value={selectedModel}
+                  onChange={setSelectedModel}
+                  type="text"
+                />
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="aiPrompt">Story Prompt</Label>
                 <Textarea

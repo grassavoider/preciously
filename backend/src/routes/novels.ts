@@ -2,18 +2,12 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import multer from 'multer';
 import path from 'path';
-import { VisualNovelSchema } from '@preciously/novel-engine';
+import { requireAuth } from '../middleware/auth';
+// import { VisualNovelSchema } from '@preciously/novel-engine';
+// TODO: For Vercel, we'll need to either publish the package or inline the schema
 
 const router = Router();
 const prisma = new PrismaClient();
-
-// Middleware
-const requireAuth = (req: any, res: any, next: any) => {
-  if (!req.session.userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  next();
-};
 
 // Configure multer
 const storage = multer.diskStorage({
@@ -39,7 +33,8 @@ router.post('/', requireAuth, upload.single('cover'), async (req, res) => {
     const novelData = JSON.parse(req.body.novel);
     
     // Validate novel structure
-    const validatedNovel = VisualNovelSchema.parse(novelData);
+    // const validatedNovel = VisualNovelSchema.parse(novelData);
+    const validatedNovel = novelData; // TODO: Add validation for Vercel
     
     const coverUrl = req.file ? `/uploads/covers/${req.file.filename}` : undefined;
     

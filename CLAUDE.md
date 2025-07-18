@@ -332,7 +332,15 @@ OPENAI_API_KEY=your_openai_api_key_here
 
 ## Recent Fixes
 
-### Image Generation (NEW)
+### Voice Generation (NEW)
+- Implemented ElevenLabs voice generation integration
+- Added voice playback to character detail pages
+- Added voice to visual novel dialogue (both VN and chat modes)
+- Fallback to Google TTS when ElevenLabs API key not configured
+- Voice selection based on character personality
+- Voice player component with controls
+
+### Image Generation
 - Implemented real image generation using Pollinations.ai (free)
 - Added optional OpenAI DALL-E 3 integration
 - Removed placeholder-only implementation

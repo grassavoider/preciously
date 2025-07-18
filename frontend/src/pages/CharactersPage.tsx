@@ -1,52 +1,24 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import axios from '@/lib/axios'
+import { useCharacters } from '@/hooks/useCharacters'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Search, Star, Download, MessageSquare, Upload } from 'lucide-react'
+import { Search, Star, Download, MessageSquare, Upload, Loader2 } from 'lucide-react'
 import CharacterImportModal from '@/components/CharacterImportModal'
 import { useAuthStore } from '@/hooks/useAuthStore'
-
-interface Character {
-  id: string
-  name: string
-  description: string
-  avatarUrl?: string
-  tags: string
-  creator: {
-    username: string
-  }
-  _count: {
-    conversations: number
-    ratings: number
-  }
-  downloadCount: number
-}
+import { useDebounce } from '@/hooks/useDebounce'
 
 export default function CharactersPage() {
-  const [characters, setCharacters] = useState<Character[]>([])
   const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
   const [importModalOpen, setImportModalOpen] = useState(false)
   const { user } = useAuthStore()
-
-  useEffect(() => {
-    fetchCharacters()
-  }, [search])
-
-  const fetchCharacters = async () => {
-    try {
-      const response = await axios.get('/api/characters', {
-        params: { search }
-      })
-      setCharacters(response.data.characters)
-    } catch (error) {
-      console.error('Failed to fetch characters:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  
+  // Debounce search to avoid too many API calls
+  const debouncedSearch = useDebounce(search, 300)
+  
+  // Use the cached query
+  const { data, isLoading, error } = useCharacters(debouncedSearch)
 
   return (
     <div className="space-y-6">
@@ -70,11 +42,17 @@ export default function CharactersPage() {
         />
       </div>
 
-      {loading ? (
-        <div className="text-center py-12">Loading...</div>
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : error ? (
+        <div className="flex justify-center py-12">
+          <p className="text-destructive">Failed to load characters. Please try again.</p>
+        </div>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {characters.map((character) => (
+          {data?.characters.map((character) => (
             <Card key={character.id} className="overflow-hidden">
               <div className="aspect-square bg-muted relative">
                 {character.avatarUrl ? (
@@ -129,7 +107,9 @@ export default function CharactersPage() {
       <CharacterImportModal
         open={importModalOpen}
         onOpenChange={setImportModalOpen}
-        onImportSuccess={fetchCharacters}
+        onImportSuccess={() => {
+          // React Query will automatically refetch due to invalidation
+        }}
       />
     </div>
   )

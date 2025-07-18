@@ -1,7 +1,9 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { useEffect } from 'react'
+import React, { useEffect, Suspense } from 'react'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from '@/components/ui/toaster'
 import { useAuthStore } from '@/hooks/useAuthStore'
+import { queryClient } from '@/lib/queryClient'
 import Layout from '@/components/Layout'
 import HomePage from '@/pages/HomePage'
 import LoginPage from '@/pages/LoginPage'
@@ -21,7 +23,7 @@ function App() {
   }, [checkAuth])
 
   return (
-    <>
+    <QueryClientProvider client={queryClient}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -36,8 +38,22 @@ function App() {
         </Route>
       </Routes>
       <Toaster />
-    </>
+      {import.meta.env.DEV && ReactQueryDevtools && (
+        <Suspense fallback={null}>
+          <ReactQueryDevtools initialIsOpen={false} />
+        </Suspense>
+      )}
+    </QueryClientProvider>
   )
 }
+
+// Lazy load React Query DevTools only in development
+const ReactQueryDevtools = import.meta.env.DEV
+  ? React.lazy(() =>
+      import('@tanstack/react-query-devtools').then((module) => ({
+        default: module.ReactQueryDevtools,
+      }))
+    )
+  : () => null
 
 export default App

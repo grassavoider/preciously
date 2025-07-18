@@ -1,8 +1,8 @@
 {
-  "buildCommand": "npm install && cd frontend && npm install && npm run build",
+  "buildCommand": "npm run vercel-build",
   "outputDirectory": "frontend/dist",
-  "framework": "vite",
-  "installCommand": "echo 'Skipping root install'",
+  "installCommand": "npm install",
+  "framework": null,
   "functions": {
     "api/**/*.ts": {
       "maxDuration": 10
@@ -14,7 +14,7 @@
       "destination": "/api/$1"
     },
     {
-      "source": "/(.*)",
+      "source": "/(.*)", 
       "destination": "/$1"
     }
   ]

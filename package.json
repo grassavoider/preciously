@@ -13,6 +13,7 @@
     "build": "npm run build:backend && npm run build:frontend",
     "build:backend": "cd backend && npm run build",
     "build:frontend": "cd frontend && npm run build",
+    "vercel-build": "cd frontend && npm install && npm run build",
     "start": "cd backend && npm start",
     "setup": "npm run setup:db",
     "setup:db": "cd backend && npx prisma generate && npx prisma migrate dev --name init",

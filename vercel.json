@@ -1,0 +1,17 @@
+{
+  "buildCommand": "cd frontend && pnpm run build",
+  "outputDirectory": "frontend/dist",
+  "framework": "vite",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "functions": {
+    "api/**/*.ts": {
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    }
+  ]
+}

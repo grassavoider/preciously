@@ -1,11 +1,5 @@
-# Backend source files (only need compiled API functions)
-backend/src
-backend/prisma
-backend/node_modules
-backend/dist
-backend/.env
-backend/dev.db
-backend/uploads
+# Ignore entire backend folder - we use serverless functions in /api
+backend/
 
 # Package source
 packages/
